@@ -7,7 +7,8 @@ import (
 	"strconv"
 
 	"github.com/dhax/go-base/auth/pwdless"
-	"github.com/go-ozzo/ozzo-validation"
+	"github.com/dhax/go-base/database"
+	validation "github.com/go-ozzo/ozzo-validation"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
@@ -20,7 +21,7 @@ var (
 
 // AccountStore defines database operations for account management.
 type AccountStore interface {
-	List(f pwdless.AccountFilter) ([]pwdless.Account, int, error)
+	List(*database.AccountFilter) ([]pwdless.Account, int, error)
 	Create(*pwdless.Account) error
 	Get(id int) (*pwdless.Account, error)
 	Update(*pwdless.Account) error
@@ -87,11 +88,11 @@ func newAccountResponse(a *pwdless.Account) *accountResponse {
 }
 
 type accountListResponse struct {
-	Accounts []pwdless.Account `json:"accounts"`
-	Count    int               `json:"count"`
+	Accounts *[]pwdless.Account `json:"accounts"`
+	Count    int                `json:"count"`
 }
 
-func newAccountListResponse(a []pwdless.Account, count int) *accountListResponse {
+func newAccountListResponse(a *[]pwdless.Account, count int) *accountListResponse {
 	resp := &accountListResponse{
 		Accounts: a,
 		Count:    count,
@@ -100,13 +101,17 @@ func newAccountListResponse(a []pwdless.Account, count int) *accountListResponse
 }
 
 func (rs *AccountResource) list(w http.ResponseWriter, r *http.Request) {
-	f := pwdless.NewAccountFilter(r.URL.Query())
+	f, err := database.NewAccountFilter(r.URL.Query())
+	if err != nil {
+		render.Render(w, r, ErrRender(err))
+		return
+	}
 	al, count, err := rs.Store.List(f)
 	if err != nil {
 		render.Render(w, r, ErrRender(err))
 		return
 	}
-	render.Respond(w, r, newAccountListResponse(al, count))
+	render.Respond(w, r, newAccountListResponse(&al, count))
 }
 
 func (rs *AccountResource) create(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +124,7 @@ func (rs *AccountResource) create(w http.ResponseWriter, r *http.Request) {
 	if err := rs.Store.Create(data.Account); err != nil {
 		switch err.(type) {
 		case validation.Errors:
-			render.Render(w, r, ErrValidation(ErrAccountValidation, err))
+			render.Render(w, r, ErrValidation(ErrAccountValidation, err.(validation.Errors)))
 			return
 		}
 		render.Render(w, r, ErrInvalidRequest(err))
@@ -144,7 +149,7 @@ func (rs *AccountResource) update(w http.ResponseWriter, r *http.Request) {
 	if err := rs.Store.Update(acc); err != nil {
 		switch err.(type) {
 		case validation.Errors:
-			render.Render(w, r, ErrValidation(ErrAccountValidation, err))
+			render.Render(w, r, ErrValidation(ErrAccountValidation, err.(validation.Errors)))
 			return
 		}
 		render.Render(w, r, ErrInvalidRequest(err))

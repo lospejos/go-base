@@ -1,15 +1,14 @@
 package pwdless
 
 import (
-	"net/url"
 	"strings"
 	"time"
 
-	"github.com/dhax/go-base/auth/jwt"
-	"github.com/go-chi/jwtauth"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/go-ozzo/ozzo-validation/is"
 	"github.com/go-pg/pg/orm"
+
+	"github.com/dhax/go-base/auth/jwt"
 )
 
 // Account represents an authenticated application user
@@ -60,40 +59,16 @@ func (a *Account) Validate() error {
 	)
 }
 
-// CanLogin returns true if is user is allowed to login.
+// CanLogin returns true if user is allowed to login.
 func (a *Account) CanLogin() bool {
 	return a.Active
 }
 
 // Claims returns the account's claims to be signed
-func (a *Account) Claims() jwtauth.Claims {
-	return jwtauth.Claims{
-		"id":    a.ID,
-		"sub":   a.Name,
-		"roles": a.Roles,
+func (a *Account) Claims() jwt.AppClaims {
+	return jwt.AppClaims{
+		ID:    a.ID,
+		Sub:   a.Name,
+		Roles: a.Roles,
 	}
-}
-
-// AccountFilter provides pagination and filtering options on accounts.
-type AccountFilter struct {
-	orm.Pager
-	Filters url.Values
-	Order   []string
-}
-
-// Filter applies an AccountFilter on an orm.Query.
-func (f *AccountFilter) Filter(q *orm.Query) (*orm.Query, error) {
-	q = q.Apply(f.Pager.Paginate)
-	q = q.Apply(orm.URLFilters(f.Filters))
-	q = q.Order(f.Order...)
-	return q, nil
-}
-
-// NewAccountFilter returns an AccountFilter with options parsed from request url values.
-func NewAccountFilter(v url.Values) AccountFilter {
-	var f AccountFilter
-	f.SetURLValues(v)
-	f.Filters = v
-	f.Order = v["order"]
-	return f
 }
